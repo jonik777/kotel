@@ -1,0 +1,17 @@
+{
+  "name": "reMoisture",
+  "version": "3.0.0",
+  "description": "Driver for Capacitive Soil Moisture Sensor v1.2 (or similar) on ESP32 & ESP-IDF",
+  "keywords": "Capacitive Soil Moisture Sensor",
+  "authors":
+  [
+    {
+      "name": "Alexander Razzhivin",
+      "email": "kotyara12@yandex.ru",
+      "url": "https://kotyara12.ru"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": ["arduino", "espidf"],
+  "platforms": ["espressif32"]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "reFXJT",
+  "version": "1.4.0",
+  "description": "Driver for RS-FXJT-N01 wind via RX485 bus on ESP32 & ESP-IDF",
+  "keywords": "RS-FXJT-N01",
+  "authors":
+  [
+    {
+      "name": "Alexander Razzhivin",
+      "email": "kotyara12@yandex.ru",
+      "url": "https://kotyara12.ru"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": ["arduino", "espidf"],
+  "platforms": ["espressif32"]
+}

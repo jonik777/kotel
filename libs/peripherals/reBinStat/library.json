@@ -1,0 +1,17 @@
+{
+  "name": "reBinStat",
+  "version": "1.0.0",
+  "description": "A class for monitoring the state of a digital input or any other binary object (door, gates, etc...) with JSON publishing to an MQTT broker",
+  "keywords": "gpio, door, gate, state",
+  "authors":
+  [
+    {
+      "name": "Alexander Razzhivin",
+      "email": "kotyara12@yandex.ru",
+      "url": "https://kotyara12.ru"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": ["espidf"],
+  "platforms": ["espressif32"]
+}

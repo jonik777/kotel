@@ -1,0 +1,17 @@
+{
+  "name": "reDHTxx",
+  "version": "1.2.0",
+  "description": "Driver for sensors DHT11,DHT12,DHT21,DHT22 on ESP32 & ESP-IDF",
+  "keywords": "DHT11,DHT12,DHT21,DHT22",
+  "authors":
+  [
+    {
+      "name": "Alexander Razzhivin",
+      "email": "kotyara12@yandex.ru",
+      "url": "https://kotyara12.ru"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": ["arduino", "espidf"],
+  "platforms": ["espressif32"]
+}

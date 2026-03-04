@@ -1,0 +1,17 @@
+{
+  "name": "reBH1750",
+  "version": "1.0.0",
+  "description": "Driver for sensors BH1750 on ESP32 & ESP-IDF",
+  "keywords": "BH1750",
+  "authors":
+  [
+    {
+      "name": "Alexander Razzhivin",
+      "email": "kotyara12@yandex.ru",
+      "url": "https://kotyara12.ru"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": ["arduino", "espidf"],
+  "platforms": ["espressif32"]
+}

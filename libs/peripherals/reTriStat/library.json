@@ -1,0 +1,17 @@
+{
+  "name": "reTriStat",
+  "version": "1.0.0",
+  "description": "A class for monitoring the status of two digital inputs or any other tri-state object (water level, etc.) with JSON publishing for an MQTT broker",
+  "keywords": "gpio, tri-state",
+  "authors":
+  [
+    {
+      "name": "Alexander Razzhivin",
+      "email": "kotyara12@yandex.ru",
+      "url": "https://kotyara12.ru"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": ["espidf"],
+  "platforms": ["espressif32"]
+}

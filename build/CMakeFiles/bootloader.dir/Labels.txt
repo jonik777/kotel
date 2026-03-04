@@ -1,0 +1,13 @@
+# Target labels
+ bootloader
+# Source files and their labels
+C:/PlatformIO/telemeter_dzen/build/CMakeFiles/bootloader
+C:/PlatformIO/telemeter_dzen/build/CMakeFiles/bootloader.rule
+C:/PlatformIO/telemeter_dzen/build/CMakeFiles/bootloader-complete.rule
+C:/PlatformIO/telemeter_dzen/build/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule
+C:/PlatformIO/telemeter_dzen/build/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule
+C:/PlatformIO/telemeter_dzen/build/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule
+C:/PlatformIO/telemeter_dzen/build/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule
+C:/PlatformIO/telemeter_dzen/build/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule
+C:/PlatformIO/telemeter_dzen/build/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule
+C:/PlatformIO/telemeter_dzen/build/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule

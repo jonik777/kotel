@@ -1,0 +1,17 @@
+{
+  "name": "reMD02",
+  "version": "1.0.0",
+  "description": "Driver for sensors XY-MD02 (SHT20 over RS485) on ESP32 & ESP-IDF",
+  "keywords": "XY-MD02",
+  "authors":
+  [
+    {
+      "name": "Alexander Razzhivin",
+      "email": "kotyara12@yandex.ru",
+      "url": "https://kotyara12.ru"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": ["arduino", "espidf"],
+  "platforms": ["espressif32"]
+}

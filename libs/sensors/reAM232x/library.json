@@ -1,0 +1,17 @@
+{
+  "name": "reAM232x",
+  "version": "1.0.0",
+  "description": "Driver for sensors AM2320/AM2321 on ESP32 & ESP-IDF",
+  "keywords": "AM2320,AM2321",
+  "authors":
+  [
+    {
+      "name": "Alexander Razzhivin",
+      "email": "kotyara12@yandex.ru",
+      "url": "https://kotyara12.ru"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": ["arduino", "espidf"],
+  "platforms": ["espressif32"]
+}

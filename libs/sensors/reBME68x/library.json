@@ -1,0 +1,17 @@
+{
+  "name": "reBME680",
+  "version": "2.0.0",
+  "description": "Driver for sensors BME680 on ESP32 & ESP-IDF. Based on Bosch API",
+  "keywords": "BME680",
+  "authors":
+  [
+    {
+      "name": "Alexander Razzhivin",
+      "email": "kotyara12@yandex.ru",
+      "url": "https://kotyara12.ru"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": ["arduino", "espidf"],
+  "platforms": ["espressif32"]
+}

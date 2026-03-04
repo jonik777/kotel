@@ -1,0 +1,17 @@
+{
+  "name": "reCCS811",
+  "version": "1.0.0",
+  "description": "Driver for sensors CCS811 on ESP32 & ESP-IDF",
+  "keywords": "CCS811",
+  "authors":
+  [
+    {
+      "name": "Alexander Razzhivin",
+      "email": "kotyara12@yandex.ru",
+      "url": "https://kotyara12.ru"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": ["arduino", "espidf"],
+  "platforms": ["espressif32"]
+}

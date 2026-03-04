@@ -1,0 +1,17 @@
+{
+  "name": "reDS18x20",
+  "version": "1.1.0",
+  "description": "Driver for sensors DS1820 on ESP32 & ESP-IDF",
+  "keywords": "DS1820,DS18B20",
+  "authors":
+  [
+    {
+      "name": "Alexander Razzhivin",
+      "email": "kotyara12@yandex.ru",
+      "url": "https://kotyara12.ru"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": ["arduino", "espidf"],
+  "platforms": ["espressif32"]
+}

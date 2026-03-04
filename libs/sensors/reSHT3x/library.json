@@ -1,0 +1,17 @@
+{
+  "name": "reSHT3X",
+  "version": "2.3.0",
+  "description": "Driver for sensors SHT30D/SHT31D/SHT35D on ESP32 & ESP-IDF",
+  "keywords": "SHT30D,SHT31D,SHT35D",
+  "authors":
+  [
+    {
+      "name": "Alexander Razzhivin",
+      "email": "kotyara12@yandex.ru",
+      "url": "https://kotyara12.ru"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": ["arduino", "espidf"],
+  "platforms": ["espressif32"]
+}
