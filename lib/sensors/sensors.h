@@ -10,7 +10,7 @@
 #include "reLed.h" 
 #include "reRangeMonitor.h"
 #include "reSensor.h" 
-#include "reDHTxx.h"
+// #include "reDHTxx.h"  -- DHT22 заменён на DS18B20
 #include "reBME280.h"
 #include "reDS18x20.h"
 #include "reLCD.h"
@@ -21,14 +21,19 @@
 // -----------------------------------------------------------------------------------------------------------------------
 
 // DHT22: Улица
-#define SENSOR_OUTDOOR_NAME "Улица (AM2302)"
+#define SENSOR_OUTDOOR_NAME "Улица (DS18B20)"
 #define SENSOR_OUTDOOR_KEY "out"
 #define SENSOR_OUTDOOR_TOPIC "outdoor"
-#define SENSOR_OUTDOOR_FILTER_MODE SENSOR_FILTER_AVERAGE
-#define SENSOR_OUTDOOR_FILTER_SIZE 20
+// SENSOR_FILTER_MEDIAN отбрасывает выбросы (-3000 C) при переходе DHT22 через 0,
+// SENSOR_FILTER_AVERAGE тянул бы среднее к мусорному значению на N отсчётов
+#define SENSOR_OUTDOOR_FILTER_MODE SENSOR_FILTER_MEDIAN
+#define SENSOR_OUTDOOR_FILTER_SIZE 7
 #define SENSOR_OUTDOOR_ERRORS_LIMIT 3
+// Физически допустимый диапазон температуры на улице
+#define SENSOR_OUTDOOR_TEMP_MIN  -50.0f
+#define SENSOR_OUTDOOR_TEMP_MAX   60.0f
 
-extern DHTxx sensorOutdoor;
+extern DS18x20 sensorOutdoor;
 
 // BME280: Комната
 #define SENSOR_INDOOR_NAME "Комната (BME280)"

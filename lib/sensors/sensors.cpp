@@ -30,7 +30,8 @@
 #include "lcd_display.h"
 
 // Определения объектов
-DHTxx sensorOutdoor(1);
+// sensorOutdoor: DS18B20 на GPIO 0 (заменён с DHT22/AM2302)
+DS18x20 sensorOutdoor(1);
 BME280 sensorIndoor(2);
 DS18x20 sensorBoiler(3);
 reLCD lcd(CONFIG_LCD_I2C_BUS, CONFIG_LCD_I2C_ADDRESS, CONFIG_LCD_I2C_TYPE);
@@ -39,6 +40,9 @@ static const char* logTAG = "SENS";
 static const char* sensorsTaskName = "sensors";
 static TaskHandle_t _sensorsTask;
 static bool _sensorsNeedStore = false;
+// Флаг валидности данных датчика улицы: false при мусорных/пустых фреймах DHT22.
+// Используется в sensorsBoilerControl() и при передаче на LCD.
+static bool _outdoorDataValid = false;
 
 // Handle параметра уставки температуры — нужен для публикации в MQTT при режиме интерполяции
 static paramsEntryHandle_t paramThermostatTemp = nullptr;
@@ -161,8 +165,14 @@ void sensorsBoilerControl()
       float boiler_temp = NAN;
       
       // Получаем температуру с датчика наружного воздуха
-      if (sensorOutdoor.getStatus() == SENSOR_STATUS_OK) {
-        outdoor_temp = sensorOutdoor.getValue2(false).filteredValue;
+      if (sensorOutdoor.getStatus() == SENSOR_STATUS_OK && _outdoorDataValid) {
+        float v = sensorOutdoor.getValue(false).filteredValue;
+        // Дополнительная защита: медиана могла ещё не "промыться" после выброса
+        if ((v >= SENSOR_OUTDOOR_TEMP_MIN) && (v <= SENSOR_OUTDOOR_TEMP_MAX)) {
+          outdoor_temp = v;
+        } else {
+          rlog_w(logTAG, "Outdoor filtered value out of range: %.2f C, treating as unavailable", v);
+        }
       }
       
       // Получаем температуру с датчика бойлера
@@ -171,7 +181,22 @@ void sensorsBoilerControl()
       }
       
       if (isnan(outdoor_temp) || isnan(boiler_temp)) {
-        newState = false; // Нет данных с датчиков
+        // Нет данных с датчика наружной температуры — безопасный режим:
+        // используем фиксированную уставку как при сильном морозе, но не максимум.
+        // Котёл работает по температуре теплоносителя с безопасной уставкой.
+        if (!isnan(boiler_temp)) {
+          float safe_target = interpolation_points[0].boiler_temp; // самая холодная точка таблицы
+          rlog_w(logTAG, "Outdoor sensor unavailable in INTERPOLATION mode, using safe fallback target: %.1f C", safe_target);
+          thermostatInternalTemp = safe_target;
+          if (paramThermostatTemp) paramsMqttPublish(paramThermostatTemp, true);
+          if (lcBoiler.getState()) {
+            newState = boiler_temp < (safe_target + 0 * thermostatInternalHyst);
+          } else {
+            newState = boiler_temp < (safe_target - 1 * thermostatInternalHyst);
+          }
+        } else {
+          newState = false; // Нет данных вообще — котёл не трогаем
+        }
       } else {
         // Рассчитываем целевую температуру бойлера
         float target_temp = calculateInterpolatedTemp(outdoor_temp, interpolation_points, interpolation_points_count);
@@ -392,7 +417,8 @@ static void sensorsInitParameters()
 
 static void sensorsInitSensors()
 {
-  // Улица
+  // Улица — DS18B20 на GPIO CONFIG_GPIO_AM2320 (GPIO 0, бывший DHT22)
+  // DS18x20 — один канал, только температура. Влажность улицы недоступна.
   static rTemperatureItem siOutdoorTemp(nullptr, CONFIG_SENSOR_TEMP_NAME, CONFIG_FORMAT_TEMP_UNIT,
     SENSOR_OUTDOOR_FILTER_MODE, SENSOR_OUTDOOR_FILTER_SIZE, 
     CONFIG_FORMAT_TEMP_VALUE, CONFIG_FORMAT_TEMP_STRING,
@@ -403,19 +429,9 @@ static void sensorsInitSensors()
       CONFIG_FORMAT_TIMESTAMP_S, CONFIG_FORMAT_TSVALUE
     #endif // CONFIG_SENSOR_TIMESTRING_ENABLE
   );
-  static rSensorItem siOutdoorHum(nullptr, CONFIG_SENSOR_HUMIDITY_NAME, 
-    SENSOR_OUTDOOR_FILTER_MODE, SENSOR_OUTDOOR_FILTER_SIZE, 
-    CONFIG_FORMAT_HUMIDITY_VALUE, CONFIG_FORMAT_HUMIDITY_STRING,
-    #if CONFIG_SENSOR_TIMESTAMP_ENABLE
-      CONFIG_FORMAT_TIMESTAMP_L, 
-    #endif // CONFIG_SENSOR_TIMESTAMP_ENABLE
-    #if CONFIG_SENSOR_TIMESTRING_ENABLE  
-      CONFIG_FORMAT_TIMESTAMP_S, CONFIG_FORMAT_TSVALUE
-    #endif // CONFIG_SENSOR_TIMESTRING_ENABLE
-  );
   sensorOutdoor.initExtItems(SENSOR_OUTDOOR_NAME, SENSOR_OUTDOOR_TOPIC, false,
-    DHT_DHT22, CONFIG_GPIO_AM2320, false, CONFIG_GPIO_RELAY_AM2320, 1,
-    &siOutdoorHum, &siOutdoorTemp,
+    (gpio_num_t)CONFIG_GPIO_AM2320, ONEWIRE_NONE, 1, DS18x20_RESOLUTION_12_BIT, true,
+    &siOutdoorTemp,
     3000, SENSOR_OUTDOOR_ERRORS_LIMIT, nullptr, sensorsPublish);
   sensorOutdoor.registerParameters(pgSensors, SENSOR_OUTDOOR_KEY, SENSOR_OUTDOOR_TOPIC, SENSOR_OUTDOOR_NAME);
   sensorOutdoor.nvsRestoreExtremums(SENSOR_OUTDOOR_KEY);
@@ -742,17 +758,58 @@ void sensorsTaskExec(void *pvParameters)
     rlog_e(logTAG, "Failed to start LCD display task");
   }
 
+  // Счётчик последовательных сбоев датчика улицы.
+  // DHT22 при температурах около 0°C выдаёт два типа мусора:
+  //   1. Знаковый артефакт: -3272°C (raw вне диапазона -50..60)
+  //   2. Пустой фрейм: 0.00°C / 0.00% (все биты нуль — BitError или потеря синхронизации)
+  // При накоплении SENSOR_OUTDOOR_FILTER_SIZE подряд идущих сбоев медианный буфер полностью
+  // "отравляется" мусором. Принудительный сброс через doChangeFilterMode() заставляет
+  // следующее нормальное значение сразу заполнить весь буфер — медиана мгновенно восстанавливается.
+  static const uint8_t OUTDOOR_OUTLIER_RESET_THRESHOLD = SENSOR_OUTDOOR_FILTER_SIZE;
+  uint8_t outdoorOutlierCount = 0;
+
   while (1) {
     // -----------------------------------------------------------------------------------------------------
     // Чтение данных с сенсоров
     // -----------------------------------------------------------------------------------------------------
     sensorOutdoor.readData();
     if (sensorOutdoor.getStatus() == SENSOR_STATUS_OK) {
-      rlog_i("OUTDOOR", "Values raw: %.2f °С / %.2f %% | out: %.2f °С / %.2f %% | min: %.2f °С / %.2f %% | max: %.2f °С / %.2f %%", 
-        sensorOutdoor.getValue2(false).rawValue, sensorOutdoor.getValue1(false).rawValue, 
-        sensorOutdoor.getValue2(false).filteredValue, sensorOutdoor.getValue1(false).filteredValue, 
-        sensorOutdoor.getExtremumsDaily2(false).minValue.filteredValue, sensorOutdoor.getExtremumsDaily1(false).minValue.filteredValue, 
-        sensorOutdoor.getExtremumsDaily2(false).maxValue.filteredValue, sensorOutdoor.getExtremumsDaily1(false).maxValue.filteredValue);
+      float outdoorRaw  = sensorOutdoor.getValue(false).rawValue; // температура (до offset)
+      // DS18B20 не имеет пустых фреймов типа DHT22, но нулевая температура теоретически возможна реальная.
+      // Оставляем только проверку диапазона.
+      bool isZeroFrame  = false; // DS18B20: нет протокольных пустых фреймов
+      bool isOutOfRange = (outdoorRaw < SENSOR_OUTDOOR_TEMP_MIN) || (outdoorRaw > SENSOR_OUTDOOR_TEMP_MAX);
+      if (isOutOfRange || isZeroFrame) {
+        outdoorOutlierCount++;
+        _outdoorDataValid = false;
+        if (isZeroFrame) {
+          rlog_w("OUTDOOR", "Zero frame (empty DHT22 response), streak: %d/%d",
+            outdoorOutlierCount, OUTDOOR_OUTLIER_RESET_THRESHOLD);
+        } else {
+          rlog_w("OUTDOOR", "Out of range value rejected: %.2f C (valid: %.1f..%.1f), streak: %d/%d",
+            outdoorRaw, SENSOR_OUTDOOR_TEMP_MIN, SENSOR_OUTDOOR_TEMP_MAX,
+            outdoorOutlierCount, OUTDOOR_OUTLIER_RESET_THRESHOLD);
+        }
+        // Если медианный буфер полностью забит мусором — сбрасываем его.
+        // После сброса (_filterInit=false) первое нормальное значение заполнит весь буфер,
+        // и медиана сразу вернёт корректный результат без "выплёскивания" мусора.
+        if (outdoorOutlierCount >= OUTDOOR_OUTLIER_RESET_THRESHOLD) {
+          rSensorItem* tempItem = sensorOutdoor.getSensorItem();
+          if (tempItem != nullptr) {
+            tempItem->doChangeFilterMode();
+            rlog_w("OUTDOOR", "Median filter reset after %d consecutive bad values", outdoorOutlierCount);
+          }
+          outdoorOutlierCount = 0;
+        }
+      } else {
+        outdoorOutlierCount = 0;
+        _outdoorDataValid = true;
+        rlog_i("OUTDOOR", "Values raw: %.2f C | out: %.2f C | min: %.2f C | max: %.2f C",
+          outdoorRaw,
+          sensorOutdoor.getValue(false).filteredValue,
+          sensorOutdoor.getExtremumsDaily(false).minValue.filteredValue,
+          sensorOutdoor.getExtremumsDaily(false).maxValue.filteredValue);
+      };
     };
     sensorIndoor.readData();
     if (sensorIndoor.getStatus() == SENSOR_STATUS_OK) {
@@ -789,7 +846,10 @@ void sensorsTaskExec(void *pvParameters)
     // -----------------------------------------------------------------------------------------------------
     {
       float ind_t = (sensorIndoor.getStatus() == SENSOR_STATUS_OK)  ? sensorIndoor.getValue2(false).filteredValue  : NAN;
-      float out_t = (sensorOutdoor.getStatus() == SENSOR_STATUS_OK) ? sensorOutdoor.getValue2(false).filteredValue : NAN;
+      float out_t_raw = (sensorOutdoor.getStatus() == SENSOR_STATUS_OK) ? sensorOutdoor.getValue(false).filteredValue : NAN;
+      // outdoorDataValid=false если последнее чтение было мусором (out-of-range или zero frame).
+      // Это предотвращает отображение "0.0" на LCD при пустом фрейме DHT22.
+      float out_t = (_outdoorDataValid && !isnan(out_t_raw) && (out_t_raw >= SENSOR_OUTDOOR_TEMP_MIN) && (out_t_raw <= SENSOR_OUTDOOR_TEMP_MAX)) ? out_t_raw : NAN;
       float boi_t = (sensorBoiler.getStatus() == SENSOR_STATUS_OK)  ? sensorBoiler.getValue(false).filteredValue   : NAN;
 
       char modeChar = '0';
@@ -845,11 +905,11 @@ void sensorsTaskExec(void *pvParameters)
       if (statesInetIsAvailabled() && timerTimeout(&omSendTimer)) {
         timerSet(&omSendTimer, iOpenMonInterval*1000);
         char * omValues = nullptr;
-        // Улица
+        // Улица — DS18B20, только температура
         if (sensorOutdoor.getStatus() == SENSOR_STATUS_OK) {
           omValues = concat_strings_div(omValues, 
-            malloc_stringf("p1=%.3f&p2=%.2f", 
-              sensorOutdoor.getValue2(false).filteredValue, sensorOutdoor.getValue1(false).filteredValue),
+            malloc_stringf("p1=%.3f", 
+              sensorOutdoor.getValue(false).filteredValue),
             "&");
         };
         // Комната
@@ -879,11 +939,11 @@ void sensorsTaskExec(void *pvParameters)
       if (statesInetIsAvailabled() && timerTimeout(&nmSendTimer)) {
         timerSet(&nmSendTimer, iNarodMonInterval*1000);
         char * nmValues = nullptr;
-        // Улица
+        // Улица — DS18B20, только температура
         if (sensorOutdoor.getStatus() == SENSOR_STATUS_OK) {
           nmValues = concat_strings_div(nmValues, 
-            malloc_stringf("Tout=%.2f&Hout=%.2f", 
-              sensorOutdoor.getValue2(false).filteredValue, sensorOutdoor.getValue1(false).filteredValue),
+            malloc_stringf("Tout=%.2f", 
+              sensorOutdoor.getValue(false).filteredValue),
             "&");
         };
         // Комната
@@ -917,8 +977,8 @@ void sensorsTaskExec(void *pvParameters)
         // Улица
         if (sensorOutdoor.getStatus() == SENSOR_STATUS_OK) {
           tsValues = concat_strings_div(tsValues, 
-            malloc_stringf("field1=%.3f&field2=%.2f", 
-              sensorOutdoor.getValue2(false).filteredValue, sensorOutdoor.getValue1(false).filteredValue),
+            malloc_stringf("field1=%.3f", 
+              sensorOutdoor.getValue(false).filteredValue),
             "&");
         };
         // Комната

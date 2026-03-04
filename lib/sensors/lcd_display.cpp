@@ -1,5 +1,7 @@
 #include "lcd_display.h"
 #include "rLog.h"
+#include <math.h>     // NAN, isnan
+#include <string.h>   // memcpy
 // sensors.h НЕ включается здесь — данные передаются через lcdUpdateData(),
 // чтобы LCD-задача не обращалась к объектам сенсоров напрямую из другого потока.
 
@@ -9,15 +11,16 @@ static const char* logTAG = "LCD";
 static TaskHandle_t _lcdTask = nullptr;
 
 // Данные для отображения — обновляются из задачи сенсоров через lcdUpdateData()
-static volatile lcd_display_data_t _displayData = {
-    .indoor_temp = NAN,
-    .outdoor_temp = NAN,
-    .boiler_temp = NAN,
+// Не volatile: защита обеспечивается мьютексом portMUX, volatile здесь не нужен
+static lcd_display_data_t _displayData = {
+    .indoor_temp = 0.0f,
+    .outdoor_temp = 0.0f,
+    .boiler_temp = 0.0f,
     .indoor_valid = false,
     .outdoor_valid = false,
     .boiler_valid = false,
     .boiler_state = false,
-    .thermostat_temp = 0.0,
+    .thermostat_temp = 0.0f,
     .mode_char = '@'
 };
 
@@ -99,7 +102,7 @@ void lcdDisplayTask(void* arg) {
     while (1) {
         // Копируем данные под защитой мьютекса
         taskENTER_CRITICAL(&_displayDataMux);
-        localData = (lcd_display_data_t)_displayData;
+        memcpy(&localData, &_displayData, sizeof(lcd_display_data_t));
         taskEXIT_CRITICAL(&_displayDataMux);
 
         // Форматируем и выводим на дисплей
